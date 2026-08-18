@@ -1,2 +1,27 @@
-import { NextResponse } from "next/server"; import { db } from "@/lib/db"; import { currentUser } from "@/lib/auth";
-export async function PATCH(req:Request,{params}:{params:Promise<{id:string}>}){const{id}=await params;const user=await currentUser();const proof=await db.proof.findUnique({where:{id}});if(!user||!proof||user.workspaceId!==proof.workspaceId)return NextResponse.json({error:"Unauthorized"},{status:401});const body=await req.json();return NextResponse.json(await db.proof.update({where:{id},data:{quote:body.quote,permission:body.permission,impactMetric:body.impactMetric||null,product:body.product||null,useCase:body.useCase||null,archived:!!body.archived}}))}
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { currentUser } from "@/lib/auth";
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const user = await currentUser();
+  const proof = await db.proof.findUnique({ where: { id } });
+  if (!user || !proof || user.workspaceId !== proof.workspaceId)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const body = await req.json();
+  return NextResponse.json(
+    await db.proof.update({
+      where: { id },
+      data: {
+        quote: body.quote,
+        permission: body.permission,
+        impactMetric: body.impactMetric || null,
+        product: body.product || null,
+        useCase: body.useCase || null,
+        archived: !!body.archived,
+      },
+    }),
+  );
+}

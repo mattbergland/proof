@@ -1,2 +1,37 @@
-import Link from "next/link"; import { db } from "@/lib/db"; import { currentUser } from "@/lib/auth"; import { Button, Header } from "@/components/ui"; import { typeLabels } from "@/lib/templates";
-export default async function Dashboard(){const user=await currentUser();if(!user)return <main className="mx-auto max-w-lg px-6 py-24"><h1 className="text-3xl font-semibold">Sign in to view your proof.</h1><Link href="/login" className="mt-6 inline-block underline">Go to login →</Link></main>;const workspaceId=user.workspaceId;const proofs=workspaceId?await db.proof.findMany({where:{workspaceId,archived:false},include:{submission:true,tags:{include:{tag:true}}},orderBy:{createdAt:"desc"}}):[];const captures=workspaceId?await db.capture.findMany({where:{workspaceId},orderBy:{createdAt:"desc"}}):[];const publicCount=proofs.filter(p=>p.permission.startsWith("PUBLIC")).length;return <main><Header workspace={user.workspace?.name||"proove.now"} action={<Link href="/captures/new"><Button>New capture</Button></Link>}/><div className="mx-auto max-w-6xl px-5 py-10 md:px-10"><div className="flex flex-wrap items-end justify-between gap-6"><div><p className="text-sm uppercase tracking-[.16em] text-[#726d63]">Workspace</p><h1 className="mt-3 text-4xl font-semibold tracking-[-.05em]">Your proof library</h1></div><Link href="/captures/new" className="text-sm underline underline-offset-4">Create a capture →</Link></div><div className="mt-10 grid grid-cols-3 border-y border-[#dfdbd2] py-5"><div><p className="text-2xl font-semibold">{proofs.length}</p><p className="mt-1 text-sm text-[#726d63]">Proof captured</p></div><div><p className="text-2xl font-semibold">{publicCount}</p><p className="mt-1 text-sm text-[#726d63]">Publicly usable</p></div><div><p className="text-2xl font-semibold">{proofs.filter(p=>p.createdAt.getMonth()===new Date().getMonth()).length}</p><p className="mt-1 text-sm text-[#726d63]">This month</p></div></div><div className="mt-8 flex gap-5 overflow-x-auto border-b border-[#dfdbd2] text-sm text-[#726d63]"><span className="border-b-2 border-[#191815] pb-3 text-[#191815]">All <small>({proofs.length})</small></span><span className="pb-3">Public</span><span className="pb-3">Ask First</span><span className="pb-3">Internal</span><input className="ml-auto mb-2 min-w-40 border-b border-[#cfc9be] bg-transparent px-2 py-1 outline-none" placeholder="Search proof…" /></div><div className="mt-8 grid gap-5 md:grid-cols-2">{proofs.map(p=><Link href={`/proofs/${p.id}`} key={p.id} className="group border border-[#dfdbd2] bg-white p-6 transition hover:border-[#191815]"><div className="flex items-start justify-between gap-4 text-xs uppercase tracking-[.14em] text-[#726d63]"><span>{p.submission.respondentCompany||"Customer"}</span><span className="text-[#b4540a]">{p.permission.replace("PUBLIC_","PUBLIC ")}</span></div><blockquote className="mt-6 text-xl leading-8 tracking-[-.02em]">“{p.quote}”</blockquote><div className="mt-8 flex items-end justify-between border-t border-[#eeeae3] pt-4 text-sm"><span>{p.submission.respondentName||"Anonymous"}{p.submission.respondentTitle&&<span className="text-[#726d63]"> · {p.submission.respondentTitle}</span>}</span><span className="text-[#726d63] group-hover:text-[#191815]">View →</span></div></Link>)}</div>{proofs.length===0&&<div className="border border-dashed border-[#cfc9be] py-20 text-center"><h2 className="text-2xl font-semibold">Your proof library starts here.</h2><p className="mt-3 text-[#726d63]">Send your first customer capture in under 60 seconds.</p><Link href="/captures/new" className="mt-6 inline-block underline">Create a capture →</Link></div>}<section className="mt-16"><h2 className="text-xl font-semibold">Captures</h2><div className="mt-4 divide-y divide-[#dfdbd2] border-y border-[#dfdbd2]">{captures.map(c=><div key={c.id} className="flex items-center justify-between py-4 text-sm"><div><span className="font-medium">{c.name}</span><span className="ml-3 text-[#726d63]">{typeLabels[c.type]}</span></div><Link className="underline" href={`/c/${c.slug}`}>Open link →</Link></div>)}</div></section></div></main>}
+import { redirect } from "next/navigation";
+import { currentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import DashboardClient from "@/components/dashboard-client";
+
+export default async function DashboardPage() {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  if (!user.workspaceId) redirect("/onboarding");
+  const [workspace, captures, proofs] = await Promise.all([
+    db.workspace.findUnique({
+      where: { id: user.workspaceId },
+      include: { _count: { select: { proofs: true } } },
+    }),
+    db.capture.findMany({
+      where: { workspaceId: user.workspaceId },
+      include: { _count: { select: { submissions: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    db.proof.findMany({
+      where: { workspaceId: user.workspaceId },
+      include: {
+        tags: { include: { tag: true } },
+        submission: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+  if (!workspace) redirect("/onboarding");
+  return (
+    <DashboardClient
+      workspace={workspace}
+      captures={captures}
+      proofs={proofs}
+    />
+  );
+}

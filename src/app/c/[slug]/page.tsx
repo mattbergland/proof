@@ -1,2 +1,38 @@
-import { db } from "@/lib/db"; import { notFound } from "next/navigation"; import CaptureClient from "./capture-client";
-export default async function CapturePage({params}:{params:Promise<{slug:string}>}){const{slug}=await params;const capture=await db.capture.findUnique({where:{slug},include:{workspace:true,questions:{orderBy:{order:"asc"}}}});if(!capture)notFound();return <CaptureClient capture={{slug:capture.slug,name:capture.name,themeId:capture.themeId,fontId:capture.fontId,showLogo:capture.showLogo,introHeadline:capture.introHeadline,introBody:capture.introBody,thankYouMessage:capture.thankYouMessage,workspace:capture.workspace.name,logoUrl:capture.workspace.logoUrl,questions:capture.questions.map(q=>({id:q.id,label:q.label,type:q.type,required:q.required,options:q.options}))}}/>}
+import { db } from "@/lib/db";
+import { notFound } from "next/navigation";
+import CaptureClient from "./capture-client";
+export default async function CapturePage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const capture = await db.capture.findUnique({
+    where: { slug },
+    include: { workspace: true, questions: { orderBy: { order: "asc" } } },
+  });
+  if (!capture) notFound();
+  return (
+    <CaptureClient
+      capture={{
+        slug: capture.slug,
+        name: capture.name,
+        themeId: capture.themeId,
+        fontId: capture.fontId,
+        showLogo: capture.showLogo,
+        introHeadline: capture.introHeadline,
+        introBody: capture.introBody,
+        thankYouMessage: capture.thankYouMessage,
+        workspace: capture.workspace.name,
+        logoUrl: capture.workspace.logoUrl,
+        questions: capture.questions.map((q) => ({
+          id: q.id,
+          label: q.label,
+          type: q.type,
+          required: q.required,
+          options: q.options,
+        })),
+      }}
+    />
+  );
+}
