@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Header, CopyButton } from "@/components/ui";
-import { permissionLabels } from "@/lib/templates";
+import { permissionLabels, permissionOptions } from "@/lib/templates";
 import ProofEditor from "./proof-editor";
 
 export default async function ProofDetail({
@@ -105,7 +105,7 @@ export default async function ProofDetail({
               <div className="py-5" key={answer.id}>
                 <p className="text-sm font-semibold">{answer.question.label}</p>
                 <p className="mt-2 leading-7 whitespace-pre-wrap text-[#726d63]">
-                  {String(answer.value)}
+                  {formatAnswer(answer.question.type, answer.value)}
                 </p>
               </div>
             ))}
@@ -113,6 +113,15 @@ export default async function ProofDetail({
         </section>
       </div>
     </main>
+  );
+}
+
+function formatAnswer(type: string, value: unknown) {
+  const rawValue = String(value);
+  if (type !== "PERMISSION") return rawValue;
+  return (
+    permissionOptions.find(([permission]) => permission === rawValue)?.[1] ||
+    "Please ask me before using it"
   );
 }
 

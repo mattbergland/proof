@@ -30,6 +30,33 @@ type CaptureClientProps = {
   capture: Capture;
 };
 
+function answersStorageKey(slug: string) {
+  return `proove:${slug}`;
+}
+
+function stepStorageKey(slug: string) {
+  return `proove:${slug}:step`;
+}
+
+function readSavedAnswers(slug: string): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(answersStorageKey(slug)) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function readSavedStep(slug: string, questionCount: number) {
+  if (typeof window === "undefined") return 0;
+  const saved = Number.parseInt(
+    localStorage.getItem(stepStorageKey(slug)) || "0",
+    10,
+  );
+  if (!Number.isInteger(saved)) return 0;
+  return Math.max(0, Math.min(saved, questionCount - 1));
+}
+
 function Completion({
   capture,
   theme,
@@ -263,17 +290,20 @@ function QuestionStep({
 export default function CaptureClient({ capture }: CaptureClientProps) {
   const theme = themes[capture.themeId as keyof typeof themes] || themes.paper;
   const font = fonts[capture.fontId as keyof typeof fonts] || fonts.modern;
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>(() => {
-    if (typeof window === "undefined") return {};
-    try {
-      return JSON.parse(localStorage.getItem(`proove:${capture.slug}`) || "{}");
-    } catch {
-      return {};
-    }
-  });
+  const [index, setIndex] = useState(() =>
+    readSavedStep(capture.slug, capture.questions.length),
+  );
+  const [answers, setAnswers] = useState<Record<string, string>>(() =>
+    readSavedAnswers(capture.slug),
+  );
   const answersRef = useRef(answers);
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      localStorage.getItem(stepStorageKey(capture.slug)) !== null ||
+      Object.keys(readSavedAnswers(capture.slug)).length > 0
+    );
+  });
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -284,7 +314,10 @@ export default function CaptureClient({ capture }: CaptureClientProps) {
     answersRef.current = next;
     setAnswers(next);
     try {
-      localStorage.setItem(`proove:${capture.slug}`, JSON.stringify(next));
+      localStorage.setItem(
+        answersStorageKey(capture.slug),
+        JSON.stringify(next),
+      );
     } catch {
       // Local autosave is best-effort when storage is unavailable.
     }
@@ -304,8 +337,14 @@ export default function CaptureClient({ capture }: CaptureClientProps) {
       return;
     }
     setDone(true);
-    localStorage.removeItem(`proove:${capture.slug}`);
+    localStorage.removeItem(answersStorageKey(capture.slug));
+    localStorage.removeItem(stepStorageKey(capture.slug));
     setBusy(false);
+  }
+
+  function start() {
+    setStarted(true);
+    localStorage.setItem(stepStorageKey(capture.slug), String(index));
   }
 
   function next(valueOverride?: string) {
@@ -315,7 +354,11 @@ export default function CaptureClient({ capture }: CaptureClientProps) {
       submit();
       return;
     }
-    setIndex((current) => current + 1);
+    setIndex((current) => {
+      const nextIndex = current + 1;
+      localStorage.setItem(stepStorageKey(capture.slug), String(nextIndex));
+      return nextIndex;
+    });
   }
 
   if (done) return <Completion capture={capture} theme={theme} />;
@@ -341,11 +384,7 @@ export default function CaptureClient({ capture }: CaptureClientProps) {
           </div>
         )}
         {!started ? (
-          <Intro
-            capture={capture}
-            theme={theme}
-            onStart={() => setStarted(true)}
-          />
+          <Intro capture={capture} theme={theme} onStart={start} />
         ) : (
           <QuestionStep
             capture={capture}

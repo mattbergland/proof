@@ -37,6 +37,9 @@ export function Header({
         >
           Settings
         </Link>
+        <Link href="/api/auth/logout" className="hover:text-[#191815]">
+          Sign out
+        </Link>
         {action}
       </nav>
     </header>
